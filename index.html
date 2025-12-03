@@ -1,0 +1,1152 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>E-Book Translator - 英文电子书阅读与翻译平台</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Font Awesome -->
+  <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+  <!-- EPUB.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.5/jszip.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/epubjs/dist/epub.min.js"></script>
+  <!-- PDF.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.min.mjs" type="module"></script>
+  <!-- Google Translate API -->
+  <script src="https://cdn.jsdelivr.net/npm/google-translate-api-x/dist/client.min.js"></script>
+  
+  <!-- Tailwind 配置 -->
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: '#3B82F6',
+            secondary: '#10B981',
+            dark: '#1E293B',
+            light: '#F8FAFC',
+            accent: '#8B5CF6'
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            serif: ['Georgia', 'Cambria', 'serif']
+          },
+          animation: {
+            'fade-in': 'fadeIn 0.5s ease-in-out',
+            'slide-in': 'slideIn 0.5s ease-in-out',
+          },
+          keyframes: {
+            fadeIn: {
+              '0%': { opacity: '0' },
+              '100%': { opacity: '1' },
+            },
+            slideIn: {
+              '0%': { transform: 'translateY(20px)', opacity: '0' },
+              '100%': { transform: 'translateY(0)', opacity: '1' },
+            },
+          },
+        }
+      }
+    }
+  </script>
+  
+  <style type="text/tailwindcss">
+    @layer utilities {
+      .bg-gradient-blue-green {
+        background: linear-gradient(135deg, #3B82F6 0%, #10B981 100%);
+      }
+      .text-shadow {
+        text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.3);
+      }
+      .transition-all-300 {
+        transition: all 300ms ease-in-out;
+      }
+      .scrollbar-hide::-webkit-scrollbar {
+        display: none;
+      }
+      .scrollbar-hide {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+      }
+    }
+  </style>
+  
+  <style>
+    /* 自定义样式 */
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background-color: #F8FAFC;
+    }
+    
+    .book-cover {
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+    
+    .book-cover:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    }
+    
+    .reader-container {
+      height: calc(100vh - 4rem);
+    }
+    
+    .epub-container {
+      height: 100%;
+      overflow-y: auto;
+    }
+    
+    .pdf-container {
+      height: 100%;
+      overflow-y: auto;
+    }
+    
+    .translation-panel {
+      transition: transform 0.3s ease, opacity 0.3s ease;
+    }
+    
+    .highlight {
+      background-color: rgba(59, 130, 246, 0.2);
+      cursor: pointer;
+    }
+    
+    .tooltip {
+      position: absolute;
+      background-color: white;
+      border-radius: 0.375rem;
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+      padding: 0.5rem;
+      z-index: 50;
+      max-width: 300px;
+      display: none;
+    }
+    
+    /* 加载动画 */
+    .loader {
+      border: 4px solid rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      border-top: 4px solid #3B82F6;
+      width: 30px;
+      height: 30px;
+      animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    /* 页面过渡动画 */
+    .page-transition {
+      transition: opacity 0.3s ease, transform 0.3s ease;
+    }
+    
+    .page-enter {
+      opacity: 0;
+      transform: translateX(20px);
+    }
+    
+    .page-enter-active {
+      opacity: 1;
+      transform: translateX(0);
+    }
+    
+    /* 背景图案 */
+    .bg-pattern {
+      background-image: url('https://p9-flow-imagex-sign.byteimg.com/tos-cn-i-a9rns2rl98/rc/pc/super_tool/76dfd8128a734db6acffcf70a127f0f9~tplv-a9rns2rl98-image.image?rcl=20251203202251DC97D8DD576EE31CA4E2&rk3s=8e244e95&rrcfp=f06b921b&x-expires=1767356629&x-signature=2Z57qRqbySCnmIOA1zaQya1pvIQ%3D');
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+    }
+    
+    /* 深色模式 */
+    .dark-mode {
+      background-color: #0F172A;
+      color: #E2E8F0;
+    }
+    
+    .dark-mode .bg-white {
+      background-color: #1E293B;
+    }
+    
+    .dark-mode .text-gray-800 {
+      color: #E2E8F0;
+    }
+    
+    .dark-mode .border-gray-200 {
+      border-color: #334155;
+    }
+    
+    .dark-mode .shadow-lg {
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.1);
+    }
+  </style>
+</head>
+<body class="min-h-screen">
+  <!-- 导航栏 -->
+  <nav class="bg-white shadow-md fixed w-full z-10">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex justify-between h-16">
+        <div class="flex items-center">
+          <a href="#" class="flex-shrink-0 flex items-center">
+            <img class="h-10 w-auto" src="https://p3-flow-imagex-sign.byteimg.com/tos-cn-i-a9rns2rl98/rc/pc/super_tool/342b49c17e8b41fa821a93c369798840~tplv-a9rns2rl98-image.image?rcl=20251203202251DC97D8DD576EE31CA4E2&rk3s=8e244e95&rrcfp=f06b921b&x-expires=1767356629&x-signature=Y%2FcnopknzPn2oeSni0ZkgnHRj4M%3D" alt="E-Book Translator Logo">
+            <span class="ml-2 text-xl font-bold text-gray-800">E-Book Translator</span>
+          </a>
+        </div>
+        <div class="flex items-center">
+          <button id="theme-toggle" class="p-2 rounded-full text-gray-500 hover:text-gray-700 focus:outline-none">
+            <i class="fa fa-moon-o"></i>
+          </button>
+          <button id="help-button" class="ml-4 p-2 rounded-full text-gray-500 hover:text-gray-700 focus:outline-none">
+            <i class="fa fa-question-circle"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- 主内容区 -->
+  <main class="pt-16">
+    <!-- 首页/上传页 -->
+    <section id="upload-section" class="min-h-screen bg-pattern flex items-center justify-center p-4">
+      <div class="max-w-4xl mx-auto bg-white rounded-xl shadow-lg p-8 animate-fade-in">
+        <div class="text-center mb-8">
+          <h1 class="text-4xl font-bold text-gray-800 mb-4">欢迎使用 E-Book Translator</h1>
+          <p class="text-lg text-gray-600">上传您的英文电子书，我们将帮您翻译成简体中文，让阅读更加轻松</p>
+        </div>
+        
+        <div class="upload-area border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-primary transition-all-300">
+          <input type="file" id="book-upload" class="hidden" accept=".epub,.pdf,.mobi">
+          <label for="book-upload" class="cursor-pointer">
+            <div class="flex flex-col items-center justify-center">
+              <i class="fa fa-cloud-upload text-5xl text-gray-400 mb-4"></i>
+              <p class="text-lg text-gray-700 mb-2">点击或拖拽文件到此处上传</p>
+              <p class="text-sm text-gray-500">支持 EPUB、PDF、MOBI 格式</p>
+            </div>
+          </label>
+        </div>
+        
+        <div class="mt-8">
+          <h3 class="text-xl font-semibold text-gray-800 mb-4">支持的功能</h3>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="bg-gray-50 p-4 rounded-lg">
+              <i class="fa fa-book text-primary text-2xl mb-2"></i>
+              <h4 class="font-medium text-gray-800">多格式支持</h4>
+              <p class="text-sm text-gray-600">支持 EPUB、PDF、MOBI 等常见电子书格式</p>
+            </div>
+            <div class="bg-gray-50 p-4 rounded-lg">
+              <i class="fa fa-language text-primary text-2xl mb-2"></i>
+              <h4 class="font-medium text-gray-800">实时翻译</h4>
+              <p class="text-sm text-gray-600">选中文字即可翻译，支持整页翻译模式</p>
+            </div>
+            <div class="bg-gray-50 p-4 rounded-lg">
+              <i class="fa fa-sliders text-primary text-2xl mb-2"></i>
+              <h4 class="font-medium text-gray-800">个性化设置</h4>
+              <p class="text-sm text-gray-600">调整字体大小、主题模式，打造舒适阅读体验</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 阅读器页面 -->
+    <section id="reader-section" class="hidden min-h-screen">
+      <div class="reader-container flex flex-col md:flex-row">
+        <!-- 左侧导航栏 -->
+        <div class="w-full md:w-64 bg-white border-r border-gray-200 p-4 overflow-y-auto">
+          <div class="mb-6">
+            <h2 id="book-title" class="text-lg font-semibold text-gray-800 truncate">书名</h2>
+            <p id="book-author" class="text-sm text-gray-600">作者</p>
+          </div>
+          
+          <div class="mb-6">
+            <h3 class="text-sm font-medium text-gray-700 uppercase tracking-wider mb-2">目录</h3>
+            <ul id="book-toc" class="space-y-1 text-sm">
+              <!-- 目录将通过 JavaScript 动态生成 -->
+            </ul>
+          </div>
+          
+          <div class="mb-6">
+            <h3 class="text-sm font-medium text-gray-700 uppercase tracking-wider mb-2">阅读设置</h3>
+            <div class="space-y-3">
+              <div>
+                <label class="block text-xs text-gray-600 mb-1">字体大小</label>
+                <div class="flex items-center">
+                  <button id="decrease-font" class="p-1 text-gray-500 hover:text-primary">
+                    <i class="fa fa-minus"></i>
+                  </button>
+                  <input type="range" id="font-size" min="12" max="24" value="16" class="mx-2 w-full">
+                  <button id="increase-font" class="p-1 text-gray-500 hover:text-primary">
+                    <i class="fa fa-plus"></i>
+                  </button>
+                </div>
+              </div>
+              
+              <div>
+                <label class="block text-xs text-gray-600 mb-1">行间距</label>
+                <div class="flex items-center">
+                  <button id="decrease-line-height" class="p-1 text-gray-500 hover:text-primary">
+                    <i class="fa fa-compress"></i>
+                  </button>
+                  <input type="range" id="line-height" min="1" max="2" step="0.1" value="1.5" class="mx-2 w-full">
+                  <button id="increase-line-height" class="p-1 text-gray-500 hover:text-primary">
+                    <i class="fa fa-expand"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div>
+            <h3 class="text-sm font-medium text-gray-700 uppercase tracking-wider mb-2">翻译设置</h3>
+            <div class="space-y-3">
+              <div class="flex items-center">
+                <input type="checkbox" id="auto-translate" class="rounded text-primary focus:ring-primary">
+                <label for="auto-translate" class="ml-2 text-sm text-gray-700">自动翻译段落</label>
+              </div>
+              
+              <div>
+                <label class="block text-xs text-gray-600 mb-1">翻译模式</label>
+                <select id="translate-mode" class="w-full text-sm border border-gray-300 rounded-md p-2">
+                  <option value="selected">选中翻译</option>
+                  <option value="full">整页翻译</option>
+                  <option value="split">原文/译文对照</option>
+                </select>
+              </div>
+              
+              <button id="clear-history" class="w-full text-xs text-gray-600 hover:text-primary">
+                清除翻译历史
+              </button>
+            </div>
+          </div>
+        </div>
+        
+        <!-- 右侧阅读区 -->
+        <div class="flex-1 flex flex-col">
+          <!-- 顶部工具栏 -->
+          <div class="bg-white border-b border-gray-200 p-2 flex items-center justify-between">
+            <div class="flex items-center">
+              <button id="back-to-library" class="p-2 text-gray-500 hover:text-primary">
+                <i class="fa fa-arrow-left"></i>
+              </button>
+              <div class="mx-4">
+                <button id="prev-page" class="p-2 text-gray-500 hover:text-primary">
+                  <i class="fa fa-chevron-left"></i>
+                </button>
+                <span id="page-number" class="mx-2 text-sm text-gray-600">1 / 1</span>
+                <button id="next-page" class="p-2 text-gray-500 hover:text-primary">
+                  <i class="fa fa-chevron-right"></i>
+                </button>
+              </div>
+            </div>
+            
+            <div class="flex items-center">
+              <button id="search-button" class="p-2 text-gray-500 hover:text-primary">
+                <i class="fa fa-search"></i>
+              </button>
+              <button id="translate-toggle" class="p-2 text-gray-500 hover:text-primary">
+                <i class="fa fa-language"></i>
+              </button>
+              <button id="bookmark-button" class="p-2 text-gray-500 hover:text-primary">
+                <i class="fa fa-bookmark-o"></i>
+              </button>
+            </div>
+          </div>
+          
+          <!-- 阅读内容区 -->
+          <div class="flex-1 relative">
+            <!-- EPUB 阅读器 -->
+            <div id="epub-container" class="epub-container w-full h-full hidden"></div>
+            
+            <!-- PDF 阅读器 -->
+            <div id="pdf-container" class="pdf-container w-full h-full hidden"></div>
+            
+            <!-- 翻译面板 -->
+            <div id="translation-panel" class="translation-panel absolute bottom-0 right-0 w-full md:w-1/2 bg-white shadow-lg rounded-t-lg p-4 transform translate-y-full">
+              <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold text-gray-800">翻译结果</h3>
+                <button id="close-translation" class="p-1 text-gray-500 hover:text-primary">
+                  <i class="fa fa-times"></i>
+                </button>
+              </div>
+              <div id="translation-result" class="prose max-w-none">
+                <!-- 翻译结果将显示在这里 -->
+              </div>
+            </div>
+            
+            <!-- 加载指示器 -->
+            <div id="loading-indicator" class="absolute inset-0 flex items-center justify-center bg-white bg-opacity-80 hidden">
+              <div class="text-center">
+                <div class="loader mx-auto mb-2"></div>
+                <p id="loading-text" class="text-gray-600">加载中...</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- 帮助模态框 -->
+  <div id="help-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden">
+    <div class="bg-white rounded-lg max-w-lg w-full mx-4 animate-slide-in">
+      <div class="flex justify-between items-center border-b border-gray-200 px-6 py-4">
+        <h3 class="text-lg font-semibold text-gray-800">使用帮助</h3>
+        <button id="close-help" class="text-gray-400 hover:text-gray-500">
+          <i class="fa fa-times"></i>
+        </button>
+      </div>
+      <div class="px-6 py-4 max-h-96 overflow-y-auto">
+        <div class="space-y-4">
+          <div>
+            <h4 class="font-medium text-gray-800">如何上传电子书？</h4>
+            <p class="text-sm text-gray-600">点击上传区域或拖拽文件到上传区域，支持 EPUB、PDF、MOBI 格式。</p>
+          </div>
+          <div>
+            <h4 class="font-medium text-gray-800">如何翻译文本？</h4>
+            <p class="text-sm text-gray-600">在阅读模式下，选中需要翻译的文本，或点击工具栏中的翻译按钮进行整页翻译。</p>
+          </div>
+          <div>
+            <h4 class="font-medium text-gray-800">如何调整阅读设置？</h4>
+            <p class="text-sm text-gray-600">在左侧导航栏中，您可以调整字体大小、行间距等阅读设置。</p>
+          </div>
+          <div>
+            <h4 class="font-medium text-gray-800">如何切换深色模式？</h4>
+            <p class="text-sm text-gray-600">点击顶部导航栏中的月亮图标即可切换深色模式。</p>
+          </div>
+          <div>
+            <h4 class="font-medium text-gray-800">支持哪些文件格式？</h4>
+            <p class="text-sm text-gray-600">我们支持 EPUB、PDF、MOBI 等常见电子书格式。</p>
+          </div>
+        </div>
+      </div>
+      <div class="bg-gray-50 px-6 py-3 flex justify-end">
+        <button id="help-ok" class="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">
+          我知道了
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 搜索模态框 -->
+  <div id="search-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden">
+    <div class="bg-white rounded-lg max-w-lg w-full mx-4 animate-slide-in">
+      <div class="flex justify-between items-center border-b border-gray-200 px-6 py-4">
+        <h3 class="text-lg font-semibold text-gray-800">搜索</h3>
+        <button id="close-search" class="text-gray-400 hover:text-gray-500">
+          <i class="fa fa-times"></i>
+        </button>
+      </div>
+      <div class="px-6 py-4">
+        <div class="relative">
+          <input type="text" id="search-input" class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="输入搜索关键词...">
+          <button id="search-submit" class="absolute right-2 top-2 text-gray-400 hover:text-primary">
+            <i class="fa fa-search"></i>
+          </button>
+        </div>
+        <div id="search-results" class="mt-4 max-h-96 overflow-y-auto">
+          <!-- 搜索结果将显示在这里 -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // 全局变量
+    let book = null;
+    let rendition = null;
+    let pdfDoc = null;
+    let currentPage = 1;
+    let totalPages = 1;
+    let bookType = '';
+    let isDarkMode = false;
+    let selectedText = '';
+    let translationHistory = [];
+    
+    // DOM 元素
+    const uploadSection = document.getElementById('upload-section');
+    const readerSection = document.getElementById('reader-section');
+    const bookUpload = document.getElementById('book-upload');
+    const epubContainer = document.getElementById('epub-container');
+    const pdfContainer = document.getElementById('pdf-container');
+    const loadingIndicator = document.getElementById('loading-indicator');
+    const loadingText = document.getElementById('loading-text');
+    const translationPanel = document.getElementById('translation-panel');
+    const translationResult = document.getElementById('translation-result');
+    const themeToggle = document.getElementById('theme-toggle');
+    const helpButton = document.getElementById('help-button');
+    const helpModal = document.getElementById('help-modal');
+    const closeHelp = document.getElementById('close-help');
+    const helpOk = document.getElementById('help-ok');
+    const searchButton = document.getElementById('search-button');
+    const searchModal = document.getElementById('search-modal');
+    const closeSearch = document.getElementById('close-search');
+    const searchInput = document.getElementById('search-input');
+    const searchSubmit = document.getElementById('search-submit');
+    const searchResults = document.getElementById('search-results');
+    const prevPage = document.getElementById('prev-page');
+    const nextPage = document.getElementById('next-page');
+    const pageNumber = document.getElementById('page-number');
+    const bookTitle = document.getElementById('book-title');
+    const bookAuthor = document.getElementById('book-author');
+    const bookToc = document.getElementById('book-toc');
+    const decreaseFont = document.getElementById('decrease-font');
+    const increaseFont = document.getElementById('increase-font');
+    const fontSize = document.getElementById('font-size');
+    const decreaseLineHeight = document.getElementById('decrease-line-height');
+    const increaseLineHeight = document.getElementById('increase-line-height');
+    const lineHeight = document.getElementById('line-height');
+    const autoTranslate = document.getElementById('auto-translate');
+    const translateMode = document.getElementById('translate-mode');
+    const clearHistory = document.getElementById('clear-history');
+    const translateToggle = document.getElementById('translate-toggle');
+    const closeTranslation = document.getElementById('close-translation');
+    const bookmarkButton = document.getElementById('bookmark-button');
+    const backToLibrary = document.getElementById('back-to-library');
+    
+    // 初始化
+    function init() {
+      // 事件监听
+      bookUpload.addEventListener('change', handleBookUpload);
+      themeToggle.addEventListener('click', toggleTheme);
+      helpButton.addEventListener('click', showHelp);
+      closeHelp.addEventListener('click', hideHelp);
+      helpOk.addEventListener('click', hideHelp);
+      searchButton.addEventListener('click', showSearch);
+      closeSearch.addEventListener('click', hideSearch);
+      searchSubmit.addEventListener('click', performSearch);
+      searchInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') performSearch();
+      });
+      prevPage.addEventListener('click', goToPrevPage);
+      nextPage.addEventListener('click', goToNextPage);
+      decreaseFont.addEventListener('click', () => {
+        fontSize.value = Math.max(12, parseInt(fontSize.value) - 1);
+        updateFontSize();
+      });
+      increaseFont.addEventListener('click', () => {
+        fontSize.value = Math.min(24, parseInt(fontSize.value) + 1);
+        updateFontSize();
+      });
+      fontSize.addEventListener('input', updateFontSize);
+      decreaseLineHeight.addEventListener('click', () => {
+        lineHeight.value = Math.max(1, parseFloat(lineHeight.value) - 0.1);
+        updateLineHeight();
+      });
+      increaseLineHeight.addEventListener('click', () => {
+        lineHeight.value = Math.min(2, parseFloat(lineHeight.value) + 0.1);
+        updateLineHeight();
+      });
+      lineHeight.addEventListener('input', updateLineHeight);
+      autoTranslate.addEventListener('change', updateAutoTranslate);
+      translateMode.addEventListener('change', updateTranslateMode);
+      clearHistory.addEventListener('click', clearTranslationHistory);
+      translateToggle.addEventListener('click', toggleTranslationPanel);
+      closeTranslation.addEventListener('click', hideTranslationPanel);
+      bookmarkButton.addEventListener('click', toggleBookmark);
+      backToLibrary.addEventListener('click', goBackToLibrary);
+      
+      // 从本地存储加载设置
+      loadSettings();
+      
+      // 设置拖拽上传
+      const uploadArea = document.querySelector('.upload-area');
+      uploadArea.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        uploadArea.classList.add('border-primary');
+      });
+      
+      uploadArea.addEventListener('dragleave', () => {
+        uploadArea.classList.remove('border-primary');
+      });
+      
+      uploadArea.addEventListener('drop', (e) => {
+        e.preventDefault();
+        uploadArea.classList.remove('border-primary');
+        
+        if (e.dataTransfer.files.length) {
+          bookUpload.files = e.dataTransfer.files;
+          handleBookUpload();
+        }
+      });
+    }
+    
+    // 处理书籍上传
+    function handleBookUpload() {
+      const file = bookUpload.files[0];
+      if (!file) return;
+      
+      const fileName = file.name.toLowerCase();
+      let fileExtension = '';
+      
+      if (fileName.endsWith('.epub')) {
+        fileExtension = 'epub';
+      } else if (fileName.endsWith('.pdf')) {
+        fileExtension = 'pdf';
+      } else if (fileName.endsWith('.mobi')) {
+        fileExtension = 'mobi';
+      } else {
+        alert('不支持的文件格式。请上传 EPUB、PDF 或 MOBI 格式的电子书。');
+        return;
+      }
+      
+      bookType = fileExtension;
+      showLoading('正在处理文件...');
+      
+      // 创建文件 URL
+      const fileUrl = URL.createObjectURL(file);
+      
+      // 根据文件类型加载
+      if (fileExtension === 'epub') {
+        loadEpub(fileUrl);
+      } else if (fileExtension === 'pdf') {
+        loadPdf(fileUrl);
+      } else if (fileExtension === 'mobi') {
+        // MOBI 格式支持需要额外的库，这里简化处理
+        alert('MOBI 格式支持正在开发中，请使用 EPUB 或 PDF 格式。');
+        hideLoading();
+      }
+    }
+    
+    // 加载 EPUB 文件
+    function loadEpub(url) {
+      try {
+        book = ePub(url);
+        
+        // 初始化渲染
+        rendition = book.renderTo(epubContainer, {
+          width: '100%',
+          height: '100%',
+          spread: 'none',
+          flow: 'scrolled'
+        });
+        
+        // 显示 EPUB 容器
+        epubContainer.classList.remove('hidden');
+        pdfContainer.classList.add('hidden');
+        
+        // 加载元数据
+        book.loaded.metadata.then((meta) => {
+          bookTitle.textContent = meta.title || '未知标题';
+          bookAuthor.textContent = meta.creator || '未知作者';
+        });
+        
+        // 加载目录
+        book.loaded.navigation.then((nav) => {
+          const toc = nav.toc || [];
+          renderToc(toc);
+        });
+        
+        // 显示内容
+        rendition.display().then(() => {
+          hideLoading();
+          showReader();
+          
+          // 设置默认样式
+          updateFontSize();
+          updateLineHeight();
+          
+          // 监听文本选择
+          rendition.on('selected', handleTextSelection);
+        });
+        
+        // 监听位置变化
+        rendition.on('locationChanged', updatePageNumber);
+        
+      } catch (error) {
+        console.error('加载 EPUB 文件失败:', error);
+        alert('加载 EPUB 文件失败，请重试。');
+        hideLoading();
+      }
+    }
+    
+    // 加载 PDF 文件
+    async function loadPdf(url) {
+      try {
+        // 设置 PDF.js worker
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.mjs';
+        
+        // 加载 PDF 文档
+        const loadingTask = pdfjsLib.getDocument(url);
+        pdfDoc = await loadingTask.promise;
+        
+        totalPages = pdfDoc.numPages;
+        pageNumber.textContent = `${currentPage} / ${totalPages}`;
+        
+        // 显示 PDF 容器
+        pdfContainer.classList.remove('hidden');
+        epubContainer.classList.add('hidden');
+        
+        // 渲染第一页
+        await renderPdfPage(currentPage);
+        
+        hideLoading();
+        showReader();
+        
+        // 设置默认样式
+        updateFontSize();
+        updateLineHeight();
+        
+      } catch (error) {
+        console.error('加载 PDF 文件失败:', error);
+        alert('加载 PDF 文件失败，请重试。');
+        hideLoading();
+      }
+    }
+    
+    // 渲染 PDF 页面
+    async function renderPdfPage(pageNum) {
+      try {
+        showLoading('正在加载页面...');
+        
+        const page = await pdfDoc.getPage(pageNum);
+        const scale = 1.5;
+        const viewport = page.getViewport({ scale });
+        
+        // 准备 canvas
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+        canvas.height = viewport.height;
+        canvas.width = viewport.width;
+        
+        // 清空容器
+        pdfContainer.innerHTML = '';
+        pdfContainer.appendChild(canvas);
+        
+        // 渲染页面
+        const renderContext = {
+          canvasContext: context,
+          viewport: viewport
+        };
+        
+        await page.render(renderContext).promise;
+        
+        // 提取文本内容用于翻译
+        const textContent = await page.getTextContent();
+        const text = textContent.items.map(item => item.str).join(' ');
+        
+        // 监听文本选择
+        canvas.addEventListener('mouseup', () => {
+          const selection = window.getSelection();
+          if (selection.toString().length > 0) {
+            handleTextSelection({
+              text: selection.toString(),
+              cfiRange: null
+            });
+          }
+        });
+        
+        // 如果启用了自动翻译，翻译整页
+        if (autoTranslate.checked && translateMode.value === 'full') {
+          translateText(text);
+        }
+        
+        currentPage = pageNum;
+        pageNumber.textContent = `${currentPage} / ${totalPages}`;
+        
+        hideLoading();
+        
+      } catch (error) {
+        console.error('渲染 PDF 页面失败:', error);
+        hideLoading();
+      }
+    }
+    
+    // 渲染目录
+    function renderToc(toc) {
+      bookToc.innerHTML = '';
+      
+      if (!toc || toc.length === 0) {
+        bookToc.innerHTML = '<li class="text-sm text-gray-500">无目录</li>';
+        return;
+      }
+      
+      toc.forEach(item => {
+        const li = document.createElement('li');
+        li.className = 'mb-1';
+        
+        const a = document.createElement('a');
+        a.href = '#';
+        a.className = 'block py-1 px-2 text-sm text-gray-700 hover:bg-gray-100 rounded';
+        a.textContent = item.label;
+        
+        a.addEventListener('click', (e) => {
+          e.preventDefault();
+          if (bookType === 'epub') {
+            rendition.display(item.href);
+          }
+        });
+        
+        li.appendChild(a);
+        bookToc.appendChild(li);
+        
+        // 处理子目录
+        if (item.subitems && item.subitems.length > 0) {
+          const subUl = document.createElement('ul');
+          subUl.className = 'pl-4 mt-1';
+          
+          item.subitems.forEach(subitem => {
+            const subLi = document.createElement('li');
+            subLi.className = 'mb-1';
+            
+            const subA = document.createElement('a');
+            subA.href = '#';
+            subA.className = 'block py-1 px-2 text-xs text-gray-600 hover:bg-gray-100 rounded';
+            subA.textContent = subitem.label;
+            
+            subA.addEventListener('click', (e) => {
+              e.preventDefault();
+              if (bookType === 'epub') {
+                rendition.display(subitem.href);
+              }
+            });
+            
+            subLi.appendChild(subA);
+            subUl.appendChild(subLi);
+          });
+          
+          li.appendChild(subUl);
+        }
+      });
+    }
+    
+    // 处理文本选择
+    function handleTextSelection(cfiRange) {
+      if (!cfiRange || !cfiRange.text) return;
+      
+      selectedText = cfiRange.text;
+      
+      // 如果启用了自动翻译，翻译选中的文本
+      if (autoTranslate.checked && translateMode.value === 'selected') {
+        translateText(selectedText);
+      }
+    }
+    
+    // 翻译文本
+    async function translateText(text) {
+      if (!text || text.trim() === '') return;
+      
+      showLoading('正在翻译...');
+      
+      try {
+        // 使用 Google Translate API
+        const result = await googleTranslate(text, {
+          to: 'zh-CN',
+          tld: 'cn'
+        });
+        
+        const translatedText = result.data[0];
+        
+        // 显示翻译结果
+        translationResult.innerHTML = `<p class="text-gray-800">${translatedText}</p>`;
+        
+        // 添加到翻译历史
+        addToTranslationHistory(text, translatedText);
+        
+        // 显示翻译面板
+        showTranslationPanel();
+        
+      } catch (error) {
+        console.error('翻译失败:', error);
+        translationResult.innerHTML = `<p class="text-red-500">翻译失败，请重试。</p>`;
+        showTranslationPanel();
+      } finally {
+        hideLoading();
+      }
+    }
+    
+    // 添加到翻译历史
+    function addToTranslationHistory(original, translated) {
+      const historyItem = {
+        id: Date.now(),
+        original,
+        translated,
+        timestamp: new Date()
+      };
+      
+      translationHistory.unshift(historyItem);
+      
+      // 限制历史记录数量
+      if (translationHistory.length > 50) {
+        translationHistory = translationHistory.slice(0, 50);
+      }
+      
+      // 保存到本地存储
+      localStorage.setItem('translationHistory', JSON.stringify(translationHistory));
+    }
+    
+    // 清除翻译历史
+    function clearTranslationHistory() {
+      translationHistory = [];
+      localStorage.removeItem('translationHistory');
+      alert('翻译历史已清除');
+    }
+    
+    // 加载翻译历史
+    function loadTranslationHistory() {
+      const saved = localStorage.getItem('translationHistory');
+      if (saved) {
+        try {
+          translationHistory = JSON.parse(saved);
+        } catch (e) {
+          translationHistory = [];
+        }
+      }
+    }
+    
+    // 更新页码
+    function updatePageNumber(location) {
+      if (bookType === 'epub' && book && book.locations) {
+        const percentage = Math.round(location.percentage * 100);
+        pageNumber.textContent = `${percentage}%`;
+      }
+    }
+    
+    // 上一页
+    function goToPrevPage() {
+      if (bookType === 'epub' && rendition) {
+        rendition.prev();
+      } else if (bookType === 'pdf' && pdfDoc) {
+        if (currentPage > 1) {
+          renderPdfPage(currentPage - 1);
+        }
+      }
+    }
+    
+    // 下一页
+    function goToNextPage() {
+      if (bookType === 'epub' && rendition) {
+        rendition.next();
+      } else if (bookType === 'pdf' && pdfDoc) {
+        if (currentPage < totalPages) {
+          renderPdfPage(currentPage + 1);
+        }
+      }
+    }
+    
+    // 更新字体大小
+    function updateFontSize() {
+      const size = fontSize.value + 'px';
+      
+      if (bookType === 'epub' && rendition) {
+        rendition.themes.fontSize(size);
+      } else if (bookType === 'pdf') {
+        // PDF 字体大小调整需要重新渲染页面，这里简化处理
+        pdfContainer.style.fontSize = size;
+      }
+    }
+    
+    // 更新行高
+    function updateLineHeight() {
+      const height = lineHeight.value;
+      
+      if (bookType === 'epub' && rendition) {
+        rendition.themes.lineHeight(height);
+      } else if (bookType === 'pdf') {
+        // PDF 行高调整需要重新渲染页面，这里简化处理
+        pdfContainer.style.lineHeight = height;
+      }
+    }
+    
+    // 更新自动翻译设置
+    function updateAutoTranslate() {
+      // 保存设置到本地存储
+      localStorage.setItem('autoTranslate', autoTranslate.checked);
+    }
+    
+    // 更新翻译模式
+    function updateTranslateMode() {
+      // 保存设置到本地存储
+      localStorage.setItem('translateMode', translateMode.value);
+    }
+    
+    // 切换翻译面板
+    function toggleTranslationPanel() {
+      if (translationPanel.classList.contains('translate-y-full')) {
+        showTranslationPanel();
+      } else {
+        hideTranslationPanel();
+      }
+    }
+    
+    // 显示翻译面板
+    function showTranslationPanel() {
+      translationPanel.classList.remove('translate-y-full');
+    }
+    
+    // 隐藏翻译面板
+    function hideTranslationPanel() {
+      translationPanel.classList.add('translate-y-full');
+    }
+    
+    // 切换书签
+    function toggleBookmark() {
+      const icon = bookmarkButton.querySelector('i');
+      
+      if (icon.classList.contains('fa-bookmark-o')) {
+        // 添加书签
+        icon.classList.remove('fa-bookmark-o');
+        icon.classList.add('fa-bookmark');
+        
+        // 保存书签位置
+        let bookmarkLocation = '';
+        
+        if (bookType === 'epub' && rendition) {
+          bookmarkLocation = rendition.currentLocation();
+        } else if (bookType === 'pdf') {
+          bookmarkLocation = currentPage.toString();
+        }
+        
+        localStorage.setItem('bookmark_' + bookTitle.textContent, bookmarkLocation);
+        
+        alert('书签已添加');
+      } else {
+        // 移除书签
+        icon.classList.remove('fa-bookmark');
+        icon.classList.add('fa-bookmark-o');
+        
+        localStorage.removeItem('bookmark_' + bookTitle.textContent);
+        
+        alert('书签已移除');
+      }
+    }
+    
+    // 执行搜索
+    function performSearch() {
+      const query = searchInput.value.trim();
+      if (!query) return;
+      
+      searchResults.innerHTML = '<p class="text-gray-600">搜索中...</p>';
+      
+      // 这里简化处理，实际应该根据电子书类型实现不同的搜索逻辑
+      setTimeout(() => {
+        searchResults.innerHTML = `
+          <div class="space-y-3">
+            <div class="p-3 bg-gray-50 rounded">
+              <p class="text-sm text-gray-800">在第 1 页找到匹配内容</p>
+              <p class="text-xs text-gray-600 mt-1">这是包含"${query}"的搜索结果示例...</p>
+            </div>
+          </div>
+        `;
+      }, 1000);
+    }
+    
+    // 返回图书馆
+    function goBackToLibrary() {
+      // 清理资源
+      if (bookType === 'epub' && rendition) {
+        rendition.destroy();
+      }
+      
+      book = null;
+      rendition = null;
+      pdfDoc = null;
+      
+      // 显示上传页面
+      showUpload();
+    }
+    
+    // 显示上传页面
+    function showUpload() {
+      uploadSection.classList.remove('hidden');
+      readerSection.classList.add('hidden');
+    }
+    
+    // 显示阅读器页面
+    function showReader() {
+      uploadSection.classList.add('hidden');
+      readerSection.classList.remove('hidden');
+    }
+    
+    // 显示加载指示器
+    function showLoading(text) {
+      loadingText.textContent = text || '加载中...';
+      loadingIndicator.classList.remove('hidden');
+    }
+    
+    // 隐藏加载指示器
+    function hideLoading() {
+      loadingIndicator.classList.add('hidden');
+    }
+    
+    // 切换主题
+    function toggleTheme() {
+      isDarkMode = !isDarkMode;
+      
+      if (isDarkMode) {
+        document.body.classList.add('dark-mode');
+        themeToggle.innerHTML = '<i class="fa fa-sun-o"></i>';
+      } else {
+        document.body.classList.remove('dark-mode');
+        themeToggle.innerHTML = '<i class="fa fa-moon-o"></i>';
+      }
+      
+      // 保存设置到本地存储
+      localStorage.setItem('darkMode', isDarkMode);
+    }
+    
+    // 显示帮助
+    function showHelp() {
+      helpModal.classList.remove('hidden');
+    }
+    
+    // 隐藏帮助
+    function hideHelp() {
+      helpModal.classList.add('hidden');
+    }
+    
+    // 显示搜索
+    function showSearch() {
+      searchModal.classList.remove('hidden');
+      searchInput.focus();
+    }
+    
+    // 隐藏搜索
+    function hideSearch() {
+      searchModal.classList.add('hidden');
+    }
+    
+    // 加载设置
+    function loadSettings() {
+      // 深色模式
+      const savedDarkMode = localStorage.getItem('darkMode');
+      if (savedDarkMode === 'true') {
+        isDarkMode = true;
+        document.body.classList.add('dark-mode');
+        themeToggle.innerHTML = '<i class="fa fa-sun-o"></i>';
+      }
+      
+      // 自动翻译
+      const savedAutoTranslate = localStorage.getItem('autoTranslate');
+      if (savedAutoTranslate === 'true') {
+        autoTranslate.checked = true;
+      }
+      
+      // 翻译模式
+      const savedTranslateMode = localStorage.getItem('translateMode');
+      if (savedTranslateMode) {
+        translateMode.value = savedTranslateMode;
+      }
+      
+      // 字体大小
+      const savedFontSize = localStorage.getItem('fontSize');
+      if (savedFontSize) {
+        fontSize.value = savedFontSize;
+      }
+      
+      // 行高
+      const savedLineHeight = localStorage.getItem('lineHeight');
+      if (savedLineHeight) {
+        lineHeight.value = savedLineHeight;
+      }
+      
+      // 翻译历史
+      loadTranslationHistory();
+    }
+    
+    // 初始化应用
+    document.addEventListener('DOMContentLoaded', init);
+  </script>
+</body>
+</html>
